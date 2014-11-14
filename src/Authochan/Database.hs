@@ -40,7 +40,7 @@ User
   name           Text       -- user's ID on server, as text.
   deriving Show
 Client
-  handle         ByteString -- sent by the client to tempauths.
+  handle         ByteString -- sent by the client to オートちゃん.
   secret         ByteString -- secret part of handle.
   nonce          Int64      -- last message nonce.
   user           UserId
