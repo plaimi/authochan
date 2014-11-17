@@ -47,5 +47,10 @@ Client
   user           UserId
   description    Text
   UniqueClient   handle
+Flag                        -- Flags for fine-tuning level of authorisation.
+  name           Text
+  true           Bool
+  client         ClientId
+  UniqueFlag     client name
   deriving Show
 |]
