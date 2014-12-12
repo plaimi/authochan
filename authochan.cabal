@@ -16,6 +16,8 @@ cabal-version:       >=1.10
 
 library
   exposed-modules:   Authochan.Database
+                     Authochan.Message
+                     Authochan.Key
   other-extensions:  GADTs
                      GeneralizedNewtypeDeriving
                      MultiParamTypeClasses
@@ -25,9 +27,14 @@ library
                      TypeSynonymInstances
   build-depends:     base >=4.6 && <4.8,
                      bytestring >=0.10 && <0.11,
+                     cryptohash >=0.11 && <0.12,
+                     monadcryptorandom >=0.6 && <0.7,
+                     mtl >=2.2 && <2.3,
                      persistent >=2.0 && <2.3,
                      persistent-template >=2.0 && <2.3,
-                     text >=1.1 && <1.3
+                     stringsearch >=0.3 && <0.4,
+                     text >=1.1 && <1.3,
+                     transformers >=0.3 && <0.5
   hs-source-dirs:    src
   default-language:  Haskell2010
 
@@ -35,8 +42,20 @@ test-suite properties
   type:              exitcode-stdio-1.0
   hs-source-dirs:    test
   main-is:           Properties.hs
+  other-modules:     Test.MutableGen
   build-depends:     base,
+                     authochan,
+                     byteable >=0.1 && <0.2,
+                     bytestring >=0.10 && <0.11,
+                     cryptohash >=0.11 && <0.12,
+                     DRBG >=0.5 && <0.6,
+                     monadcryptorandom >=0.6 && <0.7,
+                     persistent >=2.0 && <2.3,
                      QuickCheck >=2.7 && <2.8,
+                     stringsearch >=0.3 && <0.4,
+                     tagged >=0.7 && <0.8,
                      test-framework >=0.8 && <0.9,
-                     test-framework-quickcheck2 >=0.3 && <0.4
+                     test-framework-quickcheck2 >=0.3 && <0.4,
+                     text >=1.1 && <1.3,
+                     tuple >=0.3 && <0.4
   default-language:  Haskell2010
