@@ -13,6 +13,7 @@ import Control.Applicative
   (
   (<$>),
   (<*>),
+  liftA,
   )
 import Control.Monad.CryptoRandom
   (
@@ -42,6 +43,10 @@ import Data.ByteString.Search
   replace,
   split,
   )
+import Control.Monad
+  (
+  mfilter,
+  )
 import Data.Maybe
   (
   fromJust,
@@ -57,7 +62,7 @@ import Database.Persist
   (
   Key,
   PersistEntity,
-  PersistValue(PersistInt64),
+  PersistValue (PersistInt64),
   keyFromValues,
   )
 import Test.Framework
@@ -149,7 +154,7 @@ genMessage c = do
   return $ signMessage c s n b
 
 mutateMessage :: SignedMessage -> Gen SignedMessage
-mutateMessage (MkSignedMessage k sid n s b) = g >>= return . fromJust
+mutateMessage (MkSignedMessage k sid n s b) = liftA fromJust g
   where g = suchThat gm isJust
         gm = do
           (k', sid', n', s', b') <- mutateSized (k, sid, n, toBytes s, b)
@@ -158,10 +163,8 @@ mutateMessage (MkSignedMessage k sid n s b) = g >>= return . fromJust
             Just $ MkSignedMessage k' sid' n' s'' b'
 
 validatedNonce :: Client -> SignedMessage -> Property
-validatedNonce c m = verifyMessage c m === ex
-  where ex | n' > clientNonce c = Just n'
-           | otherwise          = Nothing
-        n' = smNonce m
+validatedNonce c m =
+  verifyMessage c m === mfilter (> clientNonce c) (Just $ smNonce m)
 
 propValidatedNonce :: Gen Property
 propValidatedNonce = do
@@ -170,8 +173,8 @@ propValidatedNonce = do
 
 propIntegrity :: Gen Property
 propIntegrity = do
-  c <- genClient
-  m <- suchThat (genMessage c) $ \x -> smNonce x > clientNonce c
+  c  <- genClient
+  m  <- suchThat (genMessage c) $ \x -> smNonce x > clientNonce c
   m' <- mutateMessage m
   return $ m /= m' ==> verifyMessage c m' === Nothing
 

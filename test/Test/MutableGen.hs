@@ -75,6 +75,7 @@ class MutableGen a where
   -- may define this to provide custom list mutations, e.g. 'String's for the
   -- 'Char' instance.
   mutateList = mutateListDefault
+  -- | 'newMutable' is the generator to use for new mutable values.
   newMutable :: Gen a
 
 instance (MutableGen a) => MutableGen [a] where
@@ -135,20 +136,19 @@ instance MutableGen B.ByteString where
 mutateSized :: MutableGen a => a -> Gen a
 -- | @'mutateSized' a@ generates recursive mutations of 'a', depending on
 -- QuickCheck's 'size' parametre.
-mutateSized a = sized $ \i -> choose (-i `div` 2, i) >>= go
-  where go n | n > 0     = a' >>= resize n . mutateSized
-             | otherwise = a'
-        a'   = mutate a
+mutateSized a = sized $ \i -> choose (-i `div` 2, i) >>= go (mutate a)
+  where go a' n | n > 0     = a' >>= resize n . mutateSized
+                | otherwise = a'
 
 mutateBits :: (Bits a, MutableGen a) => a -> Gen a
 -- | @'mutateBits' a@ generates bitwise mutations of 'a'.
-mutateBits a = oneof [return $ complement a, bw, sr, cb]
-  where bw = oneof [f a <$> newMutable | f <- [(.&.), (.|.), xor]]
-        sr = oneof $ [rotate a <$> choose (-b, b) | Just b <- [bs]] ++
-                     [shift a <$> elements [-1, 1]]
-        cb = complementBit a <$>
-               maybe arbitrary (\b -> choose (0, b - 1)) bs
-        bs = bitSizeMaybe a
+mutateBits a =
+  oneof [return $ complement a
+        ,oneof [f a <$> newMutable | f <- [(.&.), (.|.), xor]]
+        ,oneof $ [rotate a <$> choose (-b, b) | Just b <- [bs]]
+              ++ [shift a <$> elements [-1, 1]]
+        ,complementBit a <$> maybe arbitrary (\b -> choose (0, b - 1)) bs]
+  where bs = bitSizeMaybe a
 
 mutateNum :: (MutableGen a, Num a) => a -> Gen a
 -- | @'mutateNum' a@ generates arithmetic mutations of 'a'.
@@ -165,44 +165,62 @@ mutateElement :: MutableGen a => [a] -> Gen [a]
 -- | @'mutateElement' a@ mutates a random element of 'a'.
 mutateElement [] = return []
 mutateElement a  = do
-  (x, e:y) <- flip splitAt a <$> choose (0, l - 1)
-  e' <- mutate e
+  (x, e:y) <- flip splitAt a <$> choose (0, length a - 1)
+  e'       <- mutate e
   return $ x ++ e' : y
-  where l = length a
 
 swapElements :: [a] -> Int -> Int -> [a]
 -- | @'swapElements' l a b@ swaps the elements at position 'a' and 'b' in 'l'.
 swapElements l a b | a > b  = swapElements l b a
                    | a == b = l
-swapElements l 0 b = (y : xs) ++ x : ys
-  where (x:xs, y:ys) = splitAt b l
+swapElements l 0 b = (y : xs) ++ x : ys where (x:xs, y:ys) = splitAt b l
 swapElements l a b = head l : swapElements (tail l) (a - 1) (b - 1)
 
 mutateListStructure :: MutableGen a => [a] -> Gen [a]
 -- | @'mutateListStructure' a@ generates mutations of 'a' where elements may
 -- be added, removed or reordered, and subsequences may be mutated.
-mutateListStructure a | l > 0     = oneof [return $ reverse a, split, swp]
-                      | otherwise = return a
-  where l = length a
-        ri = choose (0, l - 1)
-        mt (lh, rh) = oneof [(,) <$> x <*> y | x <- m, y <- m]
-          where m = [f v | f <- [return, mutateList]
-                                , v <- [lh, rh]]
-        ins lh rh = do
-          let m = [last lh | not $ null lh] ++ [head rh | not $ null rh]
-          r <- case m of
-                 [] -> return []
-                 _  -> return <$> elements m
-          g <- elements $ newMutable : [elements a | not $ null a] ++
-                                       (return <$> r)
-          x <- oneof [sized $ \n -> replicate <$> choose (1, n) <*> g
-                     ,listOf1 g]
-          return $ concat [lh, x, rh]
-        del lh rh = do
-          (lf, rf) <- elements [(inits lh, [rh]), ([lh], tails rh)]
-          (++) <$> elements lf <*> elements rf
-        split = do
-          s <- flip splitAt a <$> choose (0, l)
-          (lh, rh) <- mt s
-          oneof [return lh, return $ lh ++ rh, ins lh rh, del lh rh]
-        swp = swapElements a <$> ri <*> ri
+mutateListStructure a | not (null a) = oneof [return $ reverse a
+                                             ,splitMut a
+                                             ,swapElements a <$> ri <*> ri]
+                      | otherwise    = return a
+  where ri = choose (0, length a - 1)
+
+splitMut :: MutableGen a => [a] -> Gen [a]
+-- | 'splitMut' splits a list of @'MutableGen' a@ at a random index, and then
+-- 'mutateMut's the result into a tuple.'splitMut' then returns either
+-- the first element of the tuple, the tuple concatenated, the tuple with
+-- inserted elements either from the list of @'MutableGen' a@s or completely
+-- new elements, or the tuple with one or several removed elements.
+splitMut a = do
+  s        <- flip splitAt a <$> choose (0, length a)
+  (lh, rh) <- mutateMut s
+  oneof [return lh, return $ lh ++ rh, insMut a (lh, rh), delMut (lh, rh)]
+
+mutateMut :: MutableGen a => ([a], [a]) -> Gen ([a], [a])
+-- | 'mutateMut' mutates or doesn't mutate the elements of the passed in
+-- tuple, and replace or doesn't replace one element of the tuple with the
+-- other.
+mutateMut (lh, rh) = oneof [(,) <$> x <*> y | x <- m, y <- m]
+  where m = [f v | f <- [return, mutateList], v <- [lh, rh]]
+
+insMut :: MutableGen a => [a] -> ([a], [a]) -> Gen [a]
+-- | 'insMut' inserts list elements between the tuple elements, and then
+-- concatenates them.
+insMut a (lh, rh) = do
+  let m = [last lh | not $ null lh] ++ [head rh | not $ null rh]
+  r <- case m of
+         [] -> return []
+         _  -> return <$> elements m
+  g <- elements $ newMutable : [elements a | not $ null a] ++
+                               (return <$> r)
+  x <- oneof [sized $ \n -> replicate <$> choose (1, n) <*> g
+             ,listOf1 g]
+  return $ concat [lh, x, rh]
+
+delMut :: MutableGen a => ([a], [a]) -> Gen [a]
+-- | 'delMut' either deletes a random number of elements from the end of the
+-- first list in the passed in tuple, or a random number of elements from the
+-- beginning of the second list, and then concatenates them.
+delMut (lh, rh) = do
+  (lf, rf) <- elements [(inits lh, [rh]), ([lh], tails rh)]
+  (++) <$> elements lf <*> elements rf

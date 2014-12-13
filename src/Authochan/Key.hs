@@ -23,21 +23,31 @@ import Data.Bits
   (.&.),
   shiftR,
   )
+import Data.Char
+  (
+  isAlphaNum,
+  )
+import Data.List
+  (
+  (\\),
+  )
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Char8 as B8
 
 generateKey :: (MonadCRandom e f, Functor f) => Integer -> f B.ByteString
 -- | 'generateKey' generates a cryptographically secure random 'B.ByteString'
 -- at the given security level (in bits). The resulting string consists of
 -- base-58 characters, making it is easy to handle by humans.
 generateKey b = B.map (B.index c . fromIntegral) . B.concat <$> go [] l
-  where go x n | n > 0     = do
-          bs <- (B.filter (< r) . B.map (.&. m)) <$> getBytes n
-          go (bs : x) (n - B.length bs)
-               | otherwise = return x
-        m = last $ takeWhile (r - 1 <=) $ iterate (`shiftR` 1) 255
-        l = ceiling $ fromInteger b / logBase 2 (fromIntegral r :: Double)
-        r = fromIntegral $ B.length c
-        c = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
+  where
+    go x n | n > 0     = do
+      bs <- (B.filter (< r) . B.map (.&. m)) <$> getBytes n
+      go (bs : x) (n - B.length bs)
+           | otherwise = return x
+    m = last $ takeWhile (r - 1 <=) $ iterate (`shiftR` 1) 255
+    l = ceiling $ fromInteger b / logBase 2 (fromIntegral r :: Double)
+    r = fromIntegral $ B.length c
+    c = B8.pack $ filter isAlphaNum ['1'..'z'] \\ "I0l"
 
 newClientHandle :: (MonadCRandom e f, Functor f) => f B.ByteString
 -- | 'newClientHandle' generates a random client handle.
