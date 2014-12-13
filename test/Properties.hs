@@ -85,9 +85,28 @@ import Test.QuickCheck
   )
 
 import Authochan.Database
+  (
+  Client (Client),
+  clientNonce,
+  )
 import Authochan.Key
+  (
+  newClientHandle,
+  newClientSecret,
+  newSessionID,
+  )
 import Authochan.Message
+  (
+  SignedMessage (MkSignedMessage),
+  serialiseList,
+  signMessage,
+  smNonce,
+  verifyMessage,
+  )
 import Test.MutableGen
+  (
+  mutateSized,
+  )
 
 main :: IO ()
 main = defaultMain tests
