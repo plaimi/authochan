@@ -16,11 +16,12 @@ cabal-version:       >=1.10
 
 library
   exposed-modules:   Authochan.Database
-                     Authochan.Message
                      Authochan.Key
+                     Authochan.Message
   other-extensions:  GADTs
                      GeneralizedNewtypeDeriving
                      MultiParamTypeClasses
+                     OverloadedStrings
                      QuasiQuotes
                      TemplateHaskell
                      TypeFamilies
@@ -43,6 +44,7 @@ test-suite properties
   hs-source-dirs:    test
   main-is:           Properties.hs
   other-modules:     Test.MutableGen
+  other-extensions:  OverloadedStrings
   build-depends:     base,
                      authochan,
                      byteable >=0.1 && <0.2,

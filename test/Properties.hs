@@ -36,7 +36,7 @@ import Data.Byteable
   )
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as B8
-import qualified Data.ByteString.Lazy as BL
+import qualified Data.ByteString.Lazy as LB
 import Data.ByteString.Search
   (
   replace,
@@ -116,9 +116,9 @@ tests = [testGroup "Message verification"
                    [testProperty "checks validity of nonce"
                                  propValidatedNonce
                    ,testProperty "checks integrity of the whole message"
-                                 propIntegrity]
+                                 propIntegrity
                    ,testProperty "reversibly serialises lists"
-                                 propDeserialiseList]
+                                 propDeserialiseList]]
 
 genRandom :: Gen HashDRBG
 genRandom = do
@@ -179,6 +179,6 @@ propDeserialiseList :: Gen Property
 propDeserialiseList = do
   l <-listOf (B.pack <$> listOf arbitrary)
   let s = serialiseList l
-      d = drop 1 $ map (BL.toStrict . replace "\n " (B8.pack "\n")) $
+      d = drop 1 $ map (LB.toStrict . replace "\n " (B8.pack "\n")) $
                    split "\n*" $ B8.cons '\n' s
   return $ counterexample ("s = " ++ show s) $ l === d

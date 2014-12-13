@@ -29,7 +29,7 @@ import Crypto.Hash
   )
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as B8
-import qualified Data.ByteString.Lazy as BL
+import qualified Data.ByteString.Lazy as LB
 import Data.ByteString.Search
   (
   replace,
@@ -65,7 +65,7 @@ serialiseList :: [B.ByteString] -> B.ByteString
 -- | 'serialiseList' provides a safe way to serialise a list of
 -- 'B.ByteString's
 serialiseList = B.intercalate "\n" . map f
-  where f = B8.cons '*' . BL.toStrict . replace "\n" (B8.pack "\n ")
+  where f = B8.cons '*' . LB.toStrict . replace "\n" (B8.pack "\n ")
 
 serialiseMessage :: SignedMessage -> B.ByteString
 -- | @'serialiseMessage' m@ is the data used when generating or verifying
@@ -77,7 +77,7 @@ signMessage :: Client -> B.ByteString -> Int64 -> B.ByteString
             -> SignedMessage
 -- | 'signMessage' generates a 'SignedMessage' from the provided 'Client',
 -- nonce and 'B.ByteString' message.
-signMessage c sid n b = MkSignedMessage h sid n sig b
+signMessage c sid n b = m
   where m   = MkSignedMessage h sid n sig b
         sig = hmac sec $ serialiseMessage m
         h   = clientHandle c
