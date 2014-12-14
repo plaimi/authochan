@@ -36,11 +36,6 @@ import Data.Int
   (
   Int64,
   )
-import Data.List
-  (
-  inits,
-  tails,
-  )
 import qualified Data.Tuple.All as Tu
 import Data.Word
   (
@@ -221,6 +216,6 @@ delMut :: MutableGen a => ([a], [a]) -> Gen [a]
 -- | 'delMut' either deletes a random number of elements from the end of the
 -- first list in the passed in tuple, or a random number of elements from the
 -- beginning of the second list, and then concatenates them.
-delMut (lh, rh) = do
-  (lf, rf) <- elements [(inits lh, [rh]), ([lh], tails rh)]
-  (++) <$> elements lf <*> elements rf
+delMut (lh, rh) = oneof [(++ rh) <$> f take lh
+                        ,(lh ++) <$> f drop rh]
+  where f g l = g <$> choose (0, length l) <*> return l
