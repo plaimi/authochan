@@ -134,8 +134,7 @@ propDeserialiseList = do
 propSamples :: Property
 propSamples = once . conjoin $ do
   (k, sid, n, b, sec, sig) <- samples
-  let sm = MkSignedMessage k sid n undefined b
-      ser = serialiseMessage sm
+  let ser = serialiseMessage $ MkSignedMessage k sid n undefined b
       md = hmacGetDigest (hmac sec ser) :: Digest SHA256
       ce = concat $ zipWith (++)
              ["key", show k
