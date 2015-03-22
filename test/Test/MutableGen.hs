@@ -1,7 +1,7 @@
 {- |
 Module      :  $Header$
 Description :  Typeclass for generating mutations for QuickCheck.
-Copyright   :  (c) plaimi 2014
+Copyright   :  (c) plaimi 2014-2015
 License     :  AGPL-3
 
 Maintainer  :  tempuhs@plaimi.net
@@ -32,9 +32,22 @@ import Data.Bits
   xor,
   )
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Char8 as B8
+import qualified Data.ByteString.Lazy as LB
+import qualified Data.ByteString.Lazy.Char8 as L8
+import qualified Data.CaseInsensitive as CI
+import Data.Char
+  (
+  toLower,
+  toUpper,
+  )
 import Data.Int
   (
   Int64,
+  )
+import Data.List
+  (
+  intercalate,
   )
 import qualified Data.Tuple.All as Tu
 import Data.Word
@@ -74,16 +87,23 @@ class MutableGen a where
   newMutable :: Gen a
 
 instance (MutableGen a) => MutableGen [a] where
-  mutate = mutateList
+  mutate     = mutateList
   newMutable = listOf newMutable
+
+instance MutableGen Char where
+  mutateList a = oneof [mutateListDefault a
+                       ,flip map a <$> elements [toLower, toUpper]
+                       ,intercalate "\n" <$>
+                          mutate (init . lines $ a ++ "\n.")]
+  newMutable   = arbitrary
 
 instance MutableGen Int64 where
   mutations a = [mutateBits a, mutateNum a]
-  newMutable = arbitrary
+  newMutable  = arbitrary
 
 instance MutableGen Word8 where
   mutations a = [mutateBits a, mutateNum a]
-  newMutable = arbitrary
+  newMutable  = arbitrary
 
 ap1 :: (Tu.Sel1 t a, Tu.Upd1 b t t1, Functor f) => (a -> f b) -> t -> f t1
 ap1 f a = flip Tu.upd1 a <$> f (Tu.sel1 a)
@@ -99,19 +119,19 @@ ap5 f a = flip Tu.upd5 a <$> f (Tu.sel5 a)
 instance (MutableGen a, MutableGen b) => MutableGen (a, b) where
   mutations a = [g ap1, g ap2]
     where g f = f mutate a
-  newMutable = liftM2 (,) newMutable newMutable
+  newMutable  = liftM2 (,) newMutable newMutable
 
 instance (MutableGen a, MutableGen b, MutableGen c)
       => MutableGen (a, b, c) where
   mutations a = [g ap1, g ap2, g ap3]
     where g f = f mutate a
-  newMutable = liftM3 (,,) newMutable newMutable newMutable
+  newMutable  = liftM3 (,,) newMutable newMutable newMutable
 
 instance (MutableGen a, MutableGen b, MutableGen c, MutableGen d)
       => MutableGen (a, b, c, d) where
   mutations a = [g ap1, g ap2, g ap3, g ap4]
     where g f = f mutate a
-  newMutable = liftM4 (,,,) newMutable newMutable newMutable newMutable
+  newMutable  = liftM4 (,,,) newMutable newMutable newMutable newMutable
 
 instance (MutableGen a
          ,MutableGen b
@@ -121,12 +141,22 @@ instance (MutableGen a
       => MutableGen (a, b, c, d, e) where
   mutations a = [g ap1, g ap2, g ap3, g ap4, g ap5]
     where g f = f mutate a
-  newMutable = liftM5 (,,,,) newMutable newMutable newMutable newMutable
-                             newMutable
+  newMutable  = liftM5 (,,,,) newMutable newMutable newMutable newMutable
+                              newMutable
 
 instance MutableGen B.ByteString where
-  mutations a = [B.pack <$> mutateListDefault (B.unpack a)]
-  newMutable = B.pack <$> newMutable
+  mutations a = [B.pack <$> mutate (B.unpack a)
+                ,B8.pack <$> mutate (B8.unpack a)]
+  newMutable  = oneof [B.pack <$> newMutable, B8.pack <$> newMutable]
+
+instance MutableGen LB.ByteString where
+  mutations a = [LB.pack <$> mutate (LB.unpack a)
+                ,L8.pack <$> mutate (L8.unpack a)]
+  newMutable  = oneof [LB.pack <$> newMutable, L8.pack <$> newMutable]
+
+instance (CI.FoldCase a, MutableGen a) => MutableGen (CI.CI a) where
+  mutations a = map (CI.mk <$>) $ mutations (CI.original a)
+  newMutable  = CI.mk <$> newMutable
 
 mutateSized :: MutableGen a => a -> Gen a
 -- | @'mutateSized' a@ generates recursive mutations of 'a', depending on
